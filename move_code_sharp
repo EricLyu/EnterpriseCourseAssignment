@@ -1,0 +1,23 @@
+using UnityEngine;
+using System.Collections;
+
+public class Move : MonoBehaviour {
+    public Point newPos;
+	// Use this for initialization
+	void Start () {
+        newPos.x = transform.position.x;
+        newPos.z = transform.position.z;
+	}
+	
+	// Update is called once per frame
+	void Update () {
+        //transform.position = new Vector3(newPos.x,0f,newPos.z);
+        Vector3 nowtarget = new Vector3(newPos.x, 0f, newPos.z);
+        transform.position = Vector3.MoveTowards(transform.position, nowtarget, 0.1f);
+       // transform.position = Vector3.Lerp(transform.position,nowtarget,0.1f);
+        if (Vector3.Distance(transform.position, nowtarget) < 0.1f)
+        {
+            transform.position = nowtarget;
+        }
+	}
+}

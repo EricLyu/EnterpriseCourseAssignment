@@ -1,0 +1,202 @@
+/*GameManager.cs*/
+using UnityEngine;
+using System;
+using System.Collections;
+public struct Point
+{
+    public float x;
+    public float z;
+}
+public class GameMannger : MonoBehaviour {
+    public GameObject player;
+    public GameObject target;
+    public GameObject[] obstcales;
+
+    public Point start;
+    public Point end;
+    public Point[] obstcale;
+
+    public Point nextPos;
+    public Stack nextStap = new Stack ();
+
+    public Grid[,] grids;
+    public ArrayList openList;
+    public ArrayList closeList;
+
+    public int row = 11;
+    public int col = 11;
+
+    public bool find = true;
+    //
+    void PosInit()
+    {
+        //实际坐标换成二维数组坐标
+        start.x = player.transform.position.x;
+        start.z = player.transform.position.z;
+        end.x = target.transform.position.x;
+        end.z = target.transform.position.z;
+        obstcale = new Point[obstcales.Length];
+        for (int i = 0; i < obstcales.Length; i++)
+        {
+            obstcale[i] = new Point();
+            obstcale[i].x = obstcales[i].transform.position.x;
+            obstcale[i].z = obstcales[i].transform.position.z ;
+        }
+    }
+    int Manhattan(int x, int y)
+    {
+        return (int)(Math.Abs(end.x - x) + Math.Abs(end.z - y)) * 10;
+    }
+    void GridInit()
+    {
+        grids = new Grid[row,col];
+        for (int i = 0; i < row; i++)
+        {
+            for (int j = 0; j < col; j++)
+            {
+                grids[i, j] = new Grid();
+                grids[i, j].h = Manhattan(i, j);
+                grids[i, j].i = i;
+                grids[i, j].j = j;
+                grids[i, j].type = GridType.Normal;
+            }
+        }
+    }
+    void TypeInit()
+    {
+        grids[(int)start.z + 5, (int)start.x + 5].type = GridType.Start;
+        grids[(int)end.z + 5, (int)end.x + 5].type = GridType.End;
+        
+        for (int i = 0; i < obstcales.Length; i++)
+        {
+            grids[(int)obstcales[i].transform.position.z + 5, (int)obstcales[i].transform.position.x + 5].type = GridType.Obstacle;
+        }
+    }
+	void Start () {
+        PosInit();
+        GridInit();
+        TypeInit();
+
+        openList = new ArrayList();
+        closeList = new ArrayList();
+        openList.Add(grids[(int)start.z + 5, (int)start.x + 5]);
+	}
+	
+	// Update is called once per frame
+    void Update()
+    {
+        NextStap();
+        if (Input.GetKey(KeyCode.Space))
+        {
+            if (player.GetComponent<Move>().newPos.x == player.transform.position.x)
+            {
+                print("nextStap.Count" + nextStap.Count);
+                Grid g = (Grid)nextStap.Pop();
+                nextPos.x = g.j - 5;
+                nextPos.z = g.i - 5;
+                player.GetComponent<Move>().newPos = nextPos;
+                print("nextPos.x + nextPos.z" + nextPos.x + "   " + nextPos.z);
+            }
+        }
+    }
+    void NextStap()
+    {
+        if (openList.Count == 0)
+        {
+            print("Game over");
+            return;
+        }
+        Grid grid = (Grid)openList[0];
+        if (grid.type == GridType.End)
+        {
+            if (find)
+            {
+                print("over Move");
+                Grid gridTemp = new Grid();
+                gridTemp = grids[(int)end.z+5, (int)end.x+5];
+                while (gridTemp.fatherNode != null)
+                {
+                    nextStap.Push(gridTemp);
+                    gridTemp = gridTemp.fatherNode;
+                    print("路径："+gridTemp.i+"  "+gridTemp.j);
+                }
+                find = false;
+            }
+            //能打印出路线
+            return;
+        }
+        //对周围八个方向的grid进行遍历，并将最短的g赋给对应位置
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+            {
+                if (!(i == 0 && j == 0))
+                {
+                    int m = grid.i + i;
+                    int n = grid.j + j;
+                    //不超过边界，不是障碍物，不在closelist中
+                    if (m >= 0 && m < row && n >= 0 && n < col
+                        && grids[m, n].type != GridType.Obstacle
+                        && !closeList.Contains(grids[m, n]))
+                    {
+                        //将按指定方向移动后的g记录下来
+                        int g = grid.g + (int)(Mathf.Sqrt((Mathf.Abs(i) + Mathf.Abs(j))) * 10);
+                        //如果没有运动到过，或者运动到过但此次的g更小（f也更小），更改g ,并将父节点重置
+                        if (grids[m, n].g == 0 || grids[m, n].g > g)
+                        {
+                            grids[m, n].g = g;
+                            grids[m, n].fatherNode = grid;
+                        }
+                        //确定g后最终确定f
+                        grids[m, n].f = grids[m, n].h + grids[m, n].g;
+                        //如果openList中不存在这个点，就加入进去（可能已经删除了）
+                        if (!openList.Contains(grids[m, n]))
+                        {
+                            openList.Add(grids[m, n]);
+                        }
+                        //实现按f从小到大升序排序
+                        openList.Sort();
+                    }
+                }
+            }
+        }
+        //将此次调用的第一个点添加到关闭数组
+        closeList.Add(grid);
+        //并从open数组中删除
+        openList.Remove(grid);
+    }
+}
+
+public enum GridType
+{
+    Normal,
+    Obstacle,
+    Start,
+    End,
+    Road
+}
+public class Grid : IComparable
+{
+    public int i;
+    public int j;
+    //总消耗
+    public int f;
+    public int g;//到起点消耗
+    public int h;//到终点消耗
+    public GridType type;
+    public Grid fatherNode;
+    public int CompareTo(object obj)
+    {
+        Grid grid = (Grid)obj;
+        if (this.f < grid.f)
+        {
+            //升序排序
+            return -1;
+        }
+        if (this.f > grid.f)
+        {
+            return 1;
+        }
+        return 0;
+    }
+}
